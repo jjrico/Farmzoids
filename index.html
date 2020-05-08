@@ -1,0 +1,779 @@
+<!DOCTYPE html>    <!-- this is a HTML comment -->    <!--  -->
+<html lang="">    <!-- HTML page begs/ends w 'html' tag -->
+  <head>    <!-- HTML page has 'head'section and 'body' section -->
+    <meta foo="Time-stamp: <2020-02-17 19:13:26 Chuck Siska>">
+    <!-- ================================================ Mods ====
+     o- to 2020-02-09 22:18:17: add btn onclick exported fn
+     o- to 2020-02-10 17:22:23: log btn onclick
+    .-->
+    <!--
+        Some code, mod'd, from "Introducing JavaScript Game Development" by Stuart.
+      -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Project 2</title>     <!-- Browser or tab title -->
+    <link rel="stylesheet" href="assets/styles.css">    <!-- Tiny CSS style file -->
+    <style> body {padding: 0; margin: 0;} </style>    <!-- Bit of in-line CSS -->
+    <script src="p5.js"></script>    <!-- Load P5.JS, one file -->
+    <!-- For more P5.JS, CF https://github.com/processing/p5.js/wiki -->
+    <script src="cs-sketch.js"></script>    <!-- Load my setup+draw P5-req'd fcns -->
+
+    <script type="text/javascript" src="Jathp.js"></script>    <!-- Load Jathp -->
+
+  </head>
+  <body>     <!-- HTML page body, where raw text gets displayed on the page -->
+    <h1>CPSC 481 - AI - Project 2 - Farmzoids</h1>    <!-- Text in a high priority heading -->
+  <h4>Time-stamp: <2020-04-12 16:36:21 Jeremy Rico></h4>
+  <p> Day: <p id="dayCounter" </p>
+  <p> Step Count: <p id="stepCounter" </p>
+  <p> Total Harvest (Barrels): <p id="totalHarvest" </p>
+  <p> Legend: </p>
+  <p> Black = unplotted/dead; Brown = no fruit, water level 1;
+      Yellow = no fruit, water level 2; Dark Green = no fruit, water level 3;
+      Pink = flowering; Light Green = Green fruit; Red = Red Fruit, ready to harvest </p>
+  </body>    <!-- HTML display page ends here -->
+
+<script src="assets/draw-stuff.js"></script> <!-- Load some JS fcns in a file -->
+
+<!-- ==================================================================== -->
+
+<script type="text/lisp"> ;File: prelude.lsp
+; This file contains aliases and common definitions.
+; It also imports the javascript Math functions.
+
+(def + plus)
+(def define def)
+(def #t 't) ;;'
+(def #f Nil)
+(def Nil Nil)
+(def - minus)
+(def / divide)
+(def % rem)
+(def * times)
+(def = equal)
+(def eq? equal)
+(def head car)
+(def first car)
+(def tail cdr)
+(def rest cdr)
+(def eq equal)
+(defun null (x) (equal x Nil))
+(defun zerop (x) (equal x 0))
+(defun plusp (x) (> x 0))
+(defun minusp (x) (< x 0))
+(defun evenp (x) (equal (rem x 2) 0))
+(defun oddp (x) (/= (rem x 2) 1))
+
+;; CS: pprint the Javathcript prelude fragment.
+(defun member (E L) ;; CS: orig name was "list-member", non-std.
+  (cond
+   ((null L) Nil) ;; Not found in list L.
+   ((equal E (first L)) E) ;; Found E, return L's remainder CS:. Orig retval = 't.
+   ('t (member E (rest L)))))  ;; Not in head, check tail. '
+
+(defun map (F L) ;;convert L=(e1 e2 ... eN) to ((F e1) (F e2) ... (F eN))
+  (if (null L)
+      Nil
+    (cons (F (head L))
+          (map F (tail L)))))
+
+
+; CADDRs
+
+(defun caar (x) (car (car x)))
+(defun cadr (x) (car (cdr x)))
+(defun cdar (x) (cdr (car x)))
+(defun cddr (x) (cdr (cdr x)))
+(defun caaar (x) (car (car (car x))))
+(defun caadr (x) (car (car (cdr x))))
+(defun cadar (x) (car (cdr (car x))))
+(defun caddr (x) (car (cdr (cdr x))))
+(defun cdaar (x) (cdr (car (car x))))
+(defun cdadr (x) (cdr (car (cdr x))))
+(defun cddar (x) (cdr (cdr (car x))))
+(defun cdddr (x) (cdr (cdr (cdr x))))
+(defun caaaar (x) (car (car (car (car x)))))
+(defun caaadr (x) (car (car (car (cdr x)))))
+(defun caadar (x) (car (car (cdr (car x)))))
+(defun caaddr (x) (car (car (cdr (cdr x)))))
+(defun cadaar (x) (car (cdr (car (car x)))))
+(defun cadadr (x) (car (cdr (car (cdr x)))))
+(defun caddar (x) (car (cdr (cdr (car x)))))
+(defun cadddr (x) (car (cdr (cdr (cdr x)))))
+(defun cdaaar (x) (cdr (car (car (car x)))))
+(defun cdaadr (x) (cdr (car (car (cdr x)))))
+(defun cdadar (x) (cdr (car (cdr (car x)))))
+(defun cdaddr (x) (cdr (car (cdr (cdr x)))))
+(defun cddaar (x) (cdr (cdr (car (car x)))))
+(defun cddadr (x) (cdr (cdr (car (cdr x)))))
+(defun cdddar (x) (cdr (cdr (cdr (car x)))))
+(defun cddddr (x) (cdr (cdr (cdr (cdr x)))))
+
+; Some stuff specific to being run in a browser.
+
+(def document (js "document"))
+(def body (js "document.body"))
+(def window (js "window"))
+(def getElement (method document "getElementById"))
+(def alert (method window "alert"))
+(def message alert)
+(def confirm (method window "confirm"))
+(def console (js "console"))
+
+; To be more like emacs, you might want to uncomment these two lines
+; (def setp set)
+; (def set def)
+
+; Import PI and the javascript math functions.
+;; CS: pprint the Javathcript prelude fragment.
+
+(let* ((math (js "Math"))
+       (import-math
+        (lambda (funcname)
+          (def-dyn funcname (method math funcname)))))
+  (map import-math
+       '(sin cos tan asin acos atan atan2 ;'
+         abs floor ceil round trunc
+         max min
+         pow exp sqrt log log2 log10
+         hypot
+         random)))
+
+;; Jathp extras via defines; put here to be in correct scope.
+(def expt pow)
+(def != /=)
+
+</script>
+
+
+<!-- ==================================================================== -->
+<script type="text/lisp">
+(defun msg (rlist) ;; Create webpage popup alert/msg.
+  (list
+    (message (concat "msg: " rlist ))))
+</script>
+
+
+<!-- ==================================================================== -->
+<script type="text/lisp">
+;; JP:
+;; Test Lisp stuff, for showing to console below.
+(defun fac (rn) ;; Just for test fun.
+  (if (< rn 2)
+      1
+    (* rn (fac (- rn 1)))))
+
+(defun fac2 (rn)
+     (if (< rn 2)
+         1
+       (let ((prod 1))
+         (while (>= rn 2)
+           (setq prod (* rn prod))
+           (setq rn (- rn 1)))
+         prod)))
+
+;; CS: print fcn for Jathp (to console)
+;; Must create a print-string for the value.
+;; [CS: Crash sensitivity to dbl-quoted open, "("; needs leading space.]
+(defun stgr (rx)
+  (cond
+   ((numberp rx) (concat "" rx))
+   ((null rx) "Nil")
+   ((stringp rx) rx)
+   ((atom rx) (concat "" rx))
+   ((functionp rx) (fcn-guts rx))
+;   ((functionp rx) "[function]")
+   ((consp rx)
+    (let* ((open (substring " (" 1 2)) ;; use space before (: Crash sensitive.
+           (rxlen (length rx))
+           (retv (concat open (stgr (car rx))))) ;; Recur on lkid/car.
+      (setq rx (cdr rx))
+      (while rx
+        (setq retv (concat retv " " (stgr (car rx)))) ;; Recur on lkid/car.
+        (setq rx (cdr rx)))
+      (concat retv ")")))
+   (t "[Unknown object]")))
+
+(defun logr (rx) ;; Shorter way to console.log in JS.
+  (let ((log (method console "log")))
+    (log (stgr rx)))) ;; Nicer to strigify the lisp expr first.
+
+<!-- =========================================== reverse =========== -->
+<script type="text/lisp">
+(defun reverse (rlist)
+  ;;"Return a list with the given elements in reverse order, or Nil."
+  (if (consp rlist) ;; Else Nil.
+      (let ((retv Nil))
+        (while rlist
+          (setq retv (cons (car rlist) retv))
+          (setq rlist (cdr rlist)))
+        retv)))
+</script>
+
+<!-- ========================================= lisp draw fn =========== -->
+<script type="text/lisp">
+;; Now Create simple draw fn & have P5 draw call it.
+;; Use "jp-" prefix to avoid stepping on P5 fcns; namespace for the
+poor.
+
+;; ================================================== jp-rect ====
+(defun jp-rect (rx ry rwid rhgt) ;; x,y = upper-left corner pos, P5.
+  (js (concat "rect(" rx "," ry "," rwid "," rhgt ")" )))
+
+;; ================================================== jp-circle ====
+(defun jp-circle (rx ry rdia) ;; x,y = center pos, P5.
+  (js (concat "circle(" rx "," ry "," rdia ")" )))
+
+;; ============================================ jp-cell-rbg-sum ====
+(defun jp-cell-rbg-sum ( rx ry ) ;; rx,ry is upper-left cell corner pos.
+  (let* ((px (+ 2 rx)) ;; Offset into cell.
+         (py (+ 2 ry))
+         (rbg-sum (js (concat "csjs_get_pixel_color_sum(" px "," py ")"))))
+                      ;;dbg (logr (concat "rbg-sum = " (stgr rbg-sum)))
+    rbg-sum))
+
+;; ================================================== jp-draw-bot ====
+(defun jp-draw-bot (botNum)
+  (let* ((sz (js "g_canvas.cell_size"))
+         (zz (- sz 2)) ;; -2 to size inside cell grid lines.
+         ;; bot.x * sz to cvt from cell pos to pixel pos
+         ;; +1 to paint inside the grid lines
+         (xx (+ 1 (* sz (js (concat "g_fz" botNum ".x")))))
+         (yy (+ 1 (* sz (js (concat "g_fz" botNum ".y")))))
+         (pix (jp-cell-rbg-sum xx yy)))
+
+         (js "stroke( 'white' )" ) ;; Named color.
+         (if (= botNum 1)(js "fill( 'white' )")) ;; "#RGB" color
+		     (if (= botNum 2)(js "fill( 'orange' )"))
+		     (if (= botNum 3)(js "fill( 'teal' )"))
+		     (if (= botNum 4)(js "fill( 'purple' )"))
+
+        (jp-rect xx yy zz zz)))
+
+;; ================================================== jp-move-bot ====
+(def plants(list '(4 2) '(23 2) '(30 4) '(31 7) '(26 7) '(22 7) '(11 7)
+                 '(8 10) '(31 10) '(22 10) '(25 13) '(13 14) '(9 13)
+                 '(10 16) '(5 16) '(25 16) '(38 16) '(31 15) '(34 19) '(28 18)
+                 '(25 19) '(13 18) '(10 19) '(4 20) '(7 22) '(7 38) '(13 22)
+                 '(25 38) '(28 22) '(31 38) '(4 36) '(3 25) '(10 36) '(16 25)
+                 '(19 37) '(22 25) '(25 25) '(28 25) '(34 25) '(5 28) '(8 28)
+                 '(14 28) '(19 28) '(19 22) '(22 28) '(28 28) '(32 28) '(38 28)
+                 '(4 31) '(10 31) '(16 31) '(22 31) '(28 31) '(34 31) '(7 34)
+                 '(13 34) '(19 34) '(25 34) '(31 34)))
+
+(def barn(list '(14 11) '(15 11) '(16 11) '(17 11) '(18 11) '(14 12) '(15 12)
+               '(16 12) '(17 12) '(18 12) '(14 13) '(15 13) '(16 13) '(17 13)
+               '(18 13) '(14 14) '(15 14) '(16 14) '(17 14) '(18 14) ))
+
+(def river(list '(1 14) '(1 15) '(2 13) '(3 14) '(3 12) '(3 13) '(4 11) '(4 12)
+                '(5 11) '(6 9) '(7 8) '(7 9) '(8 7) '(8 8) '(9 6) '(9 7) '(10 6)
+                '(11 4) '(12 3) '(12 4) '(13 2) '(13 3) '(14 1) '(14 2) '(15 1)))
+
+(def junctions(list ))
+(def path(list ))
+(def bestPath 372)
+(defun append (x y)
+  (cond
+    ((null x) y)
+    ('t (cons (car x) ;;'
+      (append (cdr x) y)))))
+
+
+(defun set-black (rloc)
+  (let* ((known (member rloc coordinates)))
+    ;dbg (logr (list "known = " known))
+    (if known
+      (let ((pre-list (cdr (member rloc (reverse coordinates)))))
+        (def coordinates
+          (append (reverse pre-list) (cdr known)))))))
+
+(defun removeJunction (rloc)
+  (let* ((known (member rloc junctions)))
+    ;dbg (logr (list "known = " known))
+    (if known
+      (let ((pre-list (cdr (member rloc (reverse junctions)))))
+        (def junctions
+          (append (reverse pre-list) (cdr known)))))))
+
+
+(defun destroyCell (rloc)
+  (let* ((known (member rloc coordinatesReset)))
+    ;dbg (logr (list "known = " known))
+    (if known
+      (let ((pre-list (cdr (member rloc (reverse coordinatesReset)))))
+        (def coordinatesReset
+          (append (reverse pre-list) (cdr known)))))))
+
+(def destinations1(list ))
+(def destinations2(list ))
+(def destinations3(list ))
+(def destinations4(list ))
+(def path1(list ))
+(def path2(list ))
+(def path3(list ))
+(def path4(list ))
+(def blacklist1(list ))
+(def blacklist2(list ))
+(def blacklist3(list ))
+(def blacklist4(list ))
+
+
+(defun jp-move-bot (botNum)
+  (let* ((bx (js (concat "g_fz" botNum ".x")))
+         (by (js (concat "g_fz" botNum ".y")))
+		 )
+         (def newx bx)
+		 (def newy by)
+		 (def backup false)
+		 (def junction false)
+		 (def pDirections(list ))
+		 (def direction -1)
+		(def obstacles (append plants (append barn river)))
+		(cond
+			((= botNum 1)
+			 	(let()
+					(def destinations destinations1)
+					(def obstacles (append obstacles blacklist1))
+				)
+			)
+			((= botNum 2)
+			 	(let()
+					(def destinations destinations2)
+					(def obstacles (append obstacles blacklist2))
+				)
+			)
+			((= botNum 3)
+			 	(let()
+					(def destinations destinations3)
+					(def obstacles (append obstacles blacklist3))
+				)
+			)
+			((= botNum 4)
+			 	(let()
+					(def destinations destinations4)
+					(def obstacles (append obstacles blacklist4))
+				)
+			)
+		)
+		(if (and(and (= bx 19)(= by 19))(= (car destinations) '(19 19))) ;; '
+			(let()
+				(cond
+					((= botNum 1)
+						(let()
+							(def destinations1 (cdr destinations1))
+							(def destinations destinations1)
+							(def path1(list ))
+							(def blacklist1(list ))
+              (js "g_fz1.reStock()")
+						)
+					)
+					((= botNum 2)
+						(let()
+							(def destinations2 (cdr destinations2))
+							(def destinations destinations2)
+							(def path2(list ))
+							(def blacklist2(list ))
+              (js "g_fz2.reStock()")
+						)
+					)
+					((= botNum 3)
+						(let()
+							(def destinations3 (cdr destinations3))
+							(def destinations destinations3)
+							(def path3(list ))
+							(def blacklist3(list ))
+              (js "g_fz3.reStock()")
+						)
+					)
+					((= botNum 4)
+						(let()
+							(def destinations4 (cdr destinations4))
+							(def destinations destinations4)
+							(def path4(list ))
+							(def blacklist4(list ))
+              (js "g_fz4.reStock()")
+						)
+					)
+				)
+			)
+		)
+
+		(if (= (length destinations) 0)
+			(let()
+				(cond
+					((= botNum 1)
+						(let()
+							(decision 1)
+							(def destinations destinations1)
+						)
+					)
+					((= botNum 2)
+						(let()
+							(decision 2)
+							(def destinations destinations2)
+						)
+					)
+					((= botNum 3)
+						(let()
+							(decision 3)
+							(def destinations destinations3)
+						)
+					)
+					((= botNum 4)
+						(let()
+							(decision 4)
+							(def destinations destinations4)
+						)
+					)
+				)
+			)
+		)
+
+		(let()
+			(def destinationX (caar destinations))
+			(def destinationY (car(reverse(car destinations))))
+      (def needsSupplies (js (concat "g_fz" botNum ".needsSupplies")))
+      (def isPlotting (js (concat "g_fz" botNum ".isPlotting")))
+      (def isWatering (js (concat "g_fz" botNum ".isWatering")))
+
+			(if (and (and (<= (abs(- bx destinationX)) 1)
+                    (<= (abs(- by destinationY)) 1) )
+               (/= (car destinations) '(19 19))) ;; 'destinations reached
+        (let ()
+          (cond
+            ((= isPlotting 1) (markVisited destinationX destinationY botNum))
+            ((= isWatering 1) (addWater destinationX destinationY botNum))
+            ((= isHarvesting 1) (harvest destinationX destinationY botNum)) )
+
+					(cond
+						((= botNum 1)
+							(let()
+								(def destinations1 (cdr destinations1))
+								(def destinations1 (cons '(19 19) destinations1)) ;;'
+								(def destinations destinations1)
+								(def path1(list ))
+								(def blacklist1(list )) ))
+						((= botNum 2)
+							(let()
+								(def destinations2 (cdr destinations2))
+								(def destinations2 (cons '(19 19) destinations2)) ;;'
+								(def destinations destinations2)
+								(def path2(list ))
+								(def blacklist2(list )) ))
+						((= botNum 3)
+							(let()
+								(def destinations3 (cdr destinations3))
+								(def destinations3 (cons '(19 19) destinations3)) ;;'
+								(def destinations destinations3)
+								(def path3(list ))
+								(def blacklist3(list )) ))
+						((= botNum 4)
+							(let()
+								(def destinations4 (cdr destinations4))
+								(def destinations4 (cons '(19 19) destinations4)) ;;'
+								(def destinations destinations4)
+								(def path4(list ))
+								(def blacklist4(list )) )))
+					(def destinationX (caar destinations))
+					(def destinationY (car(reverse(car destinations)))) ))
+
+      (cond
+	       ((and (<= bx destinationX) (>= by destinationY)) ;; going top right
+					(let()
+						(if (and (= (member (list (+ bx 1) (- by 1)) obstacles) Nil) (and (< bx destinationX) (> by destinationY)))
+							(def pDirections(cons 12 pDirections))
+						)
+						(if (and (= (member (list bx (- by 1)) obstacles) Nil) (> by destinationY))
+							(def pDirections(cons 0 pDirections))
+						)
+						(if (and (= (member (list (+ bx 1) by) obstacles) Nil) (< bx destinationX))
+							(def pDirections(cons 3 pDirections)) )))
+
+        ((and (<= bx destinationX) (<= by destinationY)) ;; going bottom right
+					(let()
+						(if (and (= (member (list (+ bx 1) (+ by 1)) obstacles) Nil) (and (< bx destinationX) (< by destinationY)))
+							(def pDirections(cons 45 pDirections))
+						)
+						(if (and (= (member (list bx (+ by 1)) obstacles) Nil) (< by destinationY))
+							(def pDirections(cons 6 pDirections))
+						)
+						(if (and (= (member (list (+ bx 1) by) obstacles) Nil) (< bx destinationX))
+							(def pDirections(cons 3 pDirections)) )))
+
+        ((and (>= bx destinationX) (<= by destinationY)) ;; going bottom left
+					(let()
+						(if (and (= (member (list (- bx 1) (+ by 1)) obstacles) Nil) (and (> bx destinationX) (< by destinationY)))
+							(def pDirections(cons 78 pDirections))
+						)
+						(if (and (= (member (list bx (+ by 1)) obstacles) Nil) (< by destinationY))
+							(def pDirections(cons 6 pDirections))
+						)
+						(if (and (= (member (list (- bx 1) by) obstacles) Nil) (> bx destinationX))
+							(def pDirections(cons 9 pDirections)) )))
+
+				((and (>= bx destinationX) (>= by destinationY)) ;; going top left
+					(let()
+						(if (and (= (member (list (- bx 1) (- by 1)) obstacles) Nil) (and (> bx destinationX) (> by destinationY)))
+							(def pDirections(cons 1011 pDirections))
+						)
+						(if (and (= (member (list bx (- by 1)) obstacles) Nil) (> by destinationY))
+							(def pDirections(cons 0 pDirections))
+						)
+						(if (and (= (member (list (- bx 1) by) obstacles) Nil) (> bx destinationX))
+							(def pDirections(cons 9 pDirections)) )))))
+
+		(if (> (length pDirections) 0)
+			(def direction (car(reverse pDirections))) )
+
+		(cond
+			((= direction 0)(def newy (- newy 1)))
+			((= direction 12)
+				(let()
+					(def newx (+ newx 1))
+					(def newy (- newy 1)) ))
+			((= direction 3)(def newx (+ newx 1)))
+			((= direction 45)
+				(let()
+					(def newx (+ newx 1))
+					(def newy (+ newy 1)) ))
+			((= direction 6)(def newy (+ newy 1)))
+			((= direction 78)
+				(let()
+					(def newx (- newx 1))
+					(def newy (+ newy 1)) ))
+			((= direction 9)(def newx (- newx 1)))
+			((= direction 1011)
+				(let()
+					(def newx (- newx 1))
+					(def newy (- newy 1)) ))
+			((= direction -1)
+			    (let()
+					(cond
+						((= botNum 1)
+							(let()
+								(def backup true)
+								(def newx (caar path1))
+					    		(def newy (cadar path1))
+								(def path1 (cdr path1))
+								(def blacklist1 (cons (list bx by) blacklist1)) ))
+						((= botNum 2)
+							(let()
+								(def backup true)
+								(def newx (caar path2))
+					    		(def newy (cadar path2))
+								(def path2 (cdr path2))
+								(def blacklist2 (cons (list bx by) blacklist2)) ))
+						((= botNum 3)
+							(let()
+								(def backup true)
+								(def newx (caar path3))
+					    		(def newy (cadar path3))
+								(def path3 (cdr path3))
+								(def blacklist3 (cons (list bx by) blacklist3)) ))
+						((= botNum 4)
+							(let()
+								(def backup true)
+								(def newx (caar path4))
+					    		(def newy (cadar path4))
+								(def path4 (cdr path4))
+								(def blacklist4 (cons (list bx by) blacklist4)) ))))))
+
+	(if (= backup false)
+		(let()
+			(cond
+				((= botNum 1)(def path1 (cons (list bx by) path1)))
+				((= botNum 2)(def path2 (cons (list bx by) path2)))
+				((= botNum 3)(def path3 (cons (list bx by) path3)))
+				((= botNum 4)(def path4 (cons (list bx by) path4))) )))
+	(js (concat "g_fz" botNum ".x = " (stgr newx)))
+  (js (concat "g_fz" botNum ".y = " (stgr newy)))
+	(js (concat "g_step.innerHTML = " (length path)))
+))
+
+
+;; ================================================ draw build ================
+;; Build & Setup l4j.draw_fn(): a JP lisp fn callable from JS.
+;; NB, a JS global var isnt same as a JP global var.
+;;  so we/JP must get hands on the JS var via a js() call.
+;;  and we
+
+(let* ((l4j (js "g_l4job"))
+       (fnx (lambda ( ) ;; Heres the JP lisp fn being built.
+              (let ()
+			  	(js "draw_farm('black');") ;; Reset grid to avoid leaving trail
+                (jp-move-bot 1)
+                (jp-draw-bot 1)
+				        (jp-move-bot 2)
+                (jp-draw-bot 2)
+				        (jp-move-bot 3)
+                (jp-draw-bot 3)
+				        (jp-move-bot 4)
+                (jp-draw-bot 4)))))
+  (set l4j "draw_fn" (export fnx)) ;; Here, we install the JP fn on a JS obj.
+)
+
+
+;;============================================RULES=================================================
+
+(defun decision (botNum)
+	(let()
+		(def i 1)
+    (def len (js "g_plants.length"))
+    (if (= (js "checkHarvest()") 1)
+      (let ()
+  		(while (< i len)
+  			(let()
+  				(def x (js (concat "g_plants[" i "].x")))
+  				(def y (js (concat "g_plants[" i "].y")))
+  				(def beingVisited (js (concat "g_plants[" i "].tobeVisited")))
+          (def visited (js (concat "g_plants[" i "].visited")))
+  				(if (and (/= beingVisited 1)
+                   (>= (js (concat "g_plants[" i "].fruitingState")) 3))
+              (let()
+                (cond
+                  ((= botNum 1)(def destinations1(cons (list x y) destinations1)))
+                  ((= botNum 2)(def destinations2(cons (list x y) destinations2)))
+                  ((= botNum 3)(def destinations3(cons (list x y) destinations3)))
+                  ((= botNum 4)(def destinations4(cons (list x y) destinations4)))
+                )
+                (js (concat "g_plants[" i "].tobeVisited = true"))
+                (js (concat "g_fz" botNum ".isHarvesting = true"))
+                (js "g_total_harvest += 1")
+                (logr (concat "Bot " botNum " is harvesting plot at x: " x " y: " y))
+                (def i 100)))
+            (def i (+ i 1))))))
+
+      (if (= (js "checkHarvest()") 0)
+        (let ()
+    		(while (< i len)
+    			(let()
+          (def x (js (concat "g_plants[" i "].x")))
+          (def y (js (concat "g_plants[" i "].y")))
+          (def beingVisited (js (concat "g_plants[" i "].tobeVisited")))
+          (def visited (js (concat "g_plants[" i "].visited")))
+          (cond
+            ((and (and (/= beingVisited 1)
+                       (< (js (concat "g_plants[" i "].waterLevel")) 3))
+                  (> (js (concat "g_fz" botNum ".water")) 0))
+              (let()
+                (cond
+                  ((= botNum 1)(def destinations1(cons (list x y) destinations1)))
+                  ((= botNum 2)(def destinations2(cons (list x y) destinations2)))
+                  ((= botNum 3)(def destinations3(cons (list x y) destinations3)))
+                  ((= botNum 4)(def destinations4(cons (list x y) destinations4)))
+                )
+                (js (concat "g_plants[" i "].tobeVisited = true"))
+                (js (concat "g_fz" botNum ".isWatering = true"))
+                (logr (concat "Bot " botNum " is watering plot at x: " x " y: " y))
+                (def i 100)))  ;;break loop
+
+            ((and (/= beingVisited 1)
+                        (/= visited 1))
+    					(let()
+    						(cond
+    							((= botNum 1)(def destinations1(cons (list x y) destinations1)))
+    							((= botNum 2)(def destinations2(cons (list x y) destinations2)))
+    							((= botNum 3)(def destinations3(cons (list x y) destinations3)))
+    							((= botNum 4)(def destinations4(cons (list x y) destinations4)))
+    						)
+    						(js (concat "g_plants[" i "].tobeVisited = true"))
+                (js (concat "g_fz" botNum ".isPlotting = true"))
+                (logr (concat "Bot " botNum " is placing plot at x: " x " y: " y))
+                (def i 100))))
+              (def i (+ i 1))))))))
+
+(defun markVisited (xx yy botNum)
+	(let()
+		(def i 1)
+    (def len (js "g_plants.length"))
+		(while (< i len)
+			(let()
+				(def x (js (concat "g_plants[" i "].x")))
+				(def y (js (concat "g_plants[" i "].y")))
+  				(if(and(= x xx)(= y yy))
+            (let ()
+    					(js (concat "g_plants[" i "].visited = true"))
+              (js (concat "g_plants[" i "].tobeVisited = false"))
+              (js (concat "g_fz" botNum ".plots -= 1"))
+              (if (= (js (concat "g_plants[" i "].plots")) 0)
+                  (js (concat "g_fz" botNum ".isPlotting = false")) )))
+				(def i (+ i 1))))))
+
+(defun addWater (xx yy botNum)
+	(let()
+		(def i 1)
+    (def len (js "g_plants.length"))
+		(while (< i len)
+			(let()
+				(def x (js (concat "g_plants[" i "].x")))
+				(def y (js (concat "g_plants[" i "].y")))
+				(if(and(= x xx)(= y yy))
+        (let ()
+					(js (concat "g_plants[" i "].waterLevel += 1"))
+          (js (concat "g_plants[" i "].tobeVisited = false"))
+          (js (concat "g_fz" botNum ".water -= 1"))
+          (if (= (js (concat "g_plants[" i "].waterLevel")) 0)
+              (js (concat "g_fz" botNum ".isWatering = false")) )))
+				(def i (+ i 1))	))))
+
+(defun harvest (xx yy botNum)
+	(let()
+		(def i 1)
+    (def len (js "g_plants.length"))
+		(while (< i len)
+			(let()
+				(def x (js (concat "g_plants[" i "].x")))
+				(def y (js (concat "g_plants[" i "].y")))
+				(if(and(= x xx)(= y yy))
+          (let ()
+            (js (concat "g_plants[" i "].tobeVisited = false"))
+            (js (concat "g_fz" botNum ".fruit += 1"))
+            (js (concat "g_fz" botNum ".isHarvesting = false")) ))
+				(def i (+ i 1))	))))
+
+(let* ((l4j (js "g_nature"))
+       (fnx (lambda ( ) ;; Heres the JP lisp fn being built.
+        (let()
+          (def i 1)
+          (def len (js "g_plants.length"))
+          (def rand (* (random) 100))
+          (if (<= rand 10)
+              (js "nature.clouds = true"))
+          (if (and (js "nature.clouds")
+                   (<= rand 50))
+              (js "nature.rain = true"))
+          (if (<= rand 30)
+            (let ()
+              (js "nature.wind = true")
+              (def dir (random 4))
+              (js (concat "nature.wind_dir = " (stgr dir)))))
+          (js "nature.print()")
+
+          (while (< i len)
+            (let()
+              (if (and (and (> (js (concat "g_plants[" i "].waterLevel")) 1)
+                            (/= (js "nature.clouds") 1))
+                       (js (concat "g_plants[" i "].visited")))
+                  (js (concat "g_plants[" i "].fruitingState += 1")))
+
+              (if (and (js (concat "g_plants[" i "].visited"))
+                       (js "nature.rain"))
+                  (js (concat "g_plants[" i "].incWater()")))
+
+              (if (and (/= (js "nature.rain") 1)
+                       (js (concat "g_plants[" i "].visited")))
+                  (let ()
+                  (js (concat "g_plants[" i "].decWater()"))
+                  (if (= (js (concat "g_plants[" i "].waterLevel")) 0)
+                      (js (concat "g_plants[" i "].dead()")) )))
+
+              (def i (+ i 1))))
+
+            (js "nature.reset()")))))
+  (set l4j "run_nature" (export fnx)) ;; Here, we install the JP fn on a JS obj.
+)
+
+</script>
+
+
+</html>
